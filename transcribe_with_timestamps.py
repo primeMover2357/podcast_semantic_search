@@ -1,34 +1,57 @@
 import whisper
 import os
+import glob
 import argparse
 
+def seconds_to_hms(seconds):
+    """Convert seconds to HH:MM:SS format."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
 def transcribe_with_timestamps(mp3_path, output_dir):
-    model = whisper.load_model("base")  # Use 'small', 'medium', or 'large' for better accuracy (slower)
+    model = whisper.load_model("small")  # Use 'small', 'medium', or 'large' for better accuracy (slower)
     result = model.transcribe(mp3_path, verbose=True)  # verbose=True for timestamps
 
-    # Format with timestamps (group into ~200-word chunks for search project)
+    # Group segments into ~200-word chunks
     chunks = []
     current_chunk = ""
     current_start = None
+    word_count = 0
     for segment in result['segments']:
-        start = f"[{segment['start']:.2f}]"  # Format as seconds; convert to HH:MM:SS if needed
+        start = segment['start']  # Start time in seconds
         text = segment['text'].strip()
         if not current_start:
             current_start = start
         current_chunk += f" {text}"
-        if len(current_chunk.split()) > 200:  # Chunk size
-            chunks.append(f"{current_start} {current_chunk.strip()}")
+        word_count += len(text.split())
+        if word_count > 200:  # Chunk size
+            chunks.append({
+                'timestamp': current_start,
+                'text': current_chunk.strip()
+            })
             current_chunk = ""
             current_start = None
+            word_count = 0
     if current_chunk:
-        chunks.append(f"{current_start} {current_chunk.strip()}")
+        chunks.append({
+            'timestamp': current_start,
+            'text': current_chunk.strip()
+        })
 
-    # Save to txt
+    # Save to txt with [HH:MM:SS] format
     base_name = os.path.basename(mp3_path).replace('.mp3', '.txt')
     output_path = os.path.join(output_dir, base_name)
     with open(output_path, 'w', encoding='utf-8') as f:
-        f.write('\n\n'.join(chunks))  # Double newline separator
+        for chunk in chunks:
+            timestamp_hms = seconds_to_hms(chunk['timestamp'])
+            f.write(f"[{timestamp_hms}] {chunk['text']}\n\n")
+    
     print(f"Transcript saved: {output_path}")
+    print(f"Generated {len(chunks)} chunks with timestamps:")
+    for i, chunk in enumerate(chunks):
+        print(f"Chunk {i}: [{seconds_to_hms(chunk['timestamp'])}] {chunk['text'][:50]}...")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
