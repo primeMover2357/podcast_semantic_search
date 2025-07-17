@@ -15,7 +15,7 @@ def load_transcripts(directory):
         with open(filepath, 'r', encoding='utf-8') as f:
             text = f.read().strip()
             # Split into chunks (by double newlines for paragraphs; adjust splitter if your transcripts use different separators)
-            chunks = [chunk.strip() for chunk in text.split('\n\n') if chunk.strip()]
+            chunks = chunk_text(text)
             for i, chunk in enumerate(chunks):
                 data.append({
                     'source': os.path.basename(filepath),
@@ -65,6 +65,11 @@ def semantic_search(query, index, data, top_k=5):
                 'distance': distances[0][i]
             })
     return results
+
+def chunk_text(text, chunk_size=200):
+    words = text.split()
+    return [' '.join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+
 
 if __name__ == '__main__':
     transcripts_dir = 'transcripts'
